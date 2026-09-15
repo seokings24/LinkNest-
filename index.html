@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkNest — Link Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">↗</span>
+      <div><strong>LinkNest</strong><small>CONTROL CENTER</small></div>
+    </div>
+    <div class="section-label">WORKSPACE</div>
+    <a class="nav active" href="#overview">Overview</a>
+    <a class="nav" href="#create">Create Link</a>
+    <a class="nav" href="#links">My Links</a>
+    <div class="browser-note">● Browser Workspace</div>
+  </aside>
+
+  <main class="main" id="overview">
+    <header class="header">
+      <div>
+        <span class="pill">MY WORKSPACE</span>
+        <h1>Link Dashboard</h1>
+        <p>Create, copy and delete your links.</p>
+      </div>
+      <button class="ghost" id="siteBtn" type="button">View Site ↗</button>
+    </header>
+
+    <div id="notice" class="notice" aria-live="polite"></div>
+
+    <section class="grid">
+      <form class="card create-card" id="createForm">
+        <h2>Create New Link</h2>
+
+        <label>URL SLUG
+          <input id="slug" name="slug" required
+            pattern="[A-Za-z0-9_-]+"
+            maxlength="80"
+            autocomplete="off"
+            placeholder="example-link">
+          <span class="help">Example: <b>example-link</b></span>
+        </label>
+
+        <label>TITLE
+          <input id="title" name="title" required maxlength="160"
+            placeholder="My photo">
+        </label>
+
+        <label>PHOTO URL
+          <input id="image" name="image" type="url" required
+            placeholder="https://example.com/photo.jpg">
+          <span class="help">Use a direct image URL.</span>
+        </label>
+
+        <div class="preview hidden" id="preview">
+          <img id="previewImage" alt="Photo preview">
+          <span>PHOTO PREVIEW</span>
+        </div>
+
+        <label>DESTINATION URL
+          <input id="destination" name="destination" type="url" required
+            placeholder="https://example.com">
+        </label>
+
+        <button class="primary" type="submit">Create Link <span>→</span></button>
+      </form>
+
+      <section class="card links-card" id="links">
+        <div class="links-head">
+          <div><h2>My Links</h2><p>Your links in this browser</p></div>
+          <strong id="count">0</strong>
+        </div>
+        <div id="list" class="list"></div>
+      </section>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "linknest_browser_links_v3";
+  const $ = id => document.getElementById(id);
+
+  const slugEl = $("slug");
+  const titleEl = $("title");
+  const imageEl = $("image");
+  const destinationEl = $("destination");
+  const form = $("createForm");
+  const list = $("list");
+  const count = $("count");
+  const notice = $("notice");
+  const preview = $("preview");
+  const previewImage = $("previewImage");
+
+  function getLinks() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveLinks(items) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function cleanSlug(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  function safeUrl(value) {
+    try {
+      const u = new URL(value);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",
+      '"':"&quot;","'":"&#039;"
+    }[ch]));
+  }
+
+  function basePath() {
+    return location.pathname.endsWith("/")
+      ? location.pathname
+      : location.pathname.replace(/\/[^/]*$/, "/");
+  }
+
+  function publicLink(slug) {
+    return location.origin + basePath() + "go/" + encodeURIComponent(slug);
+  }
+
+  function showNotice(text, type="ok") {
+    notice.textContent = text;
+    notice.className = "notice " + type;
+    clearTimeout(showNotice.timer);
+    showNotice.timer = setTimeout(() => {
+      notice.textContent = "";
+      notice.className = "notice";
+    }, 2800);
+  }
+
+  function render() {
+    const items = getLinks();
+    count.textContent = items.length;
+
+    if (!items.length) {
+      list.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">↗</div>
+          <b>No links yet</b>
+          <span>Create your first link from the panel.</span>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = items.map(item => {
+      const url = publicLink(item.slug);
+      return `
+        <article class="link-row">
+          <img class="thumb" src="${escapeHtml(item.image)}" alt=""
+               onerror="this.classList.add('broken')">
+          <div class="link-info">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(url)}</span>
+            <small>/${escapeHtml(item.slug)}</small>
+          </div>
+          <div class="actions">
+            <button type="button" data-copy="${escapeHtml(item.slug)}">Copy</button>
+            <a href="${escapeHtml("./go/" + encodeURIComponent(item.slug))}">Open</a>
+            <button class="delete" type="button" data-delete="${escapeHtml(item.slug)}">×</button>
+          </div>
+        </article>`;
+    }).join("");
+  }
+
+  imageEl.addEventListener("input", () => {
+    const value = imageEl.value.trim();
+    if (safeUrl(value)) {
+      previewImage.src = value;
+      preview.classList.remove("hidden");
+    } else {
+      preview.classList.add("hidden");
+      previewImage.removeAttribute("src");
+    }
+  });
+
+  slugEl.addEventListener("input", () => {
+    const cleaned = cleanSlug(slugEl.value);
+    if (slugEl.value !== cleaned) slugEl.value = cleaned;
+  });
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+
+    const slug = cleanSlug(slugEl.value);
+    const title = titleEl.value.trim();
+    const image = imageEl.value.trim();
+    const destination = destinationEl.value.trim();
+
+    if (!slug) return showNotice("Please enter a URL slug.", "error");
+    if (!title) return showNotice("Please enter a title.", "error");
+    if (!safeUrl(image)) return showNotice("Enter a valid photo URL.", "error");
+    if (!safeUrl(destination)) return showNotice("Enter a valid destination URL.", "error");
+
+    const items = getLinks();
+    if (items.some(x => x.slug === slug)) {
+      return showNotice("That URL slug already exists.", "error");
+    }
+
+    items.unshift({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      slug, title, image, destination,
+      createdAt: new Date().toISOString()
+    });
+
+    saveLinks(items);
+    form.reset();
+    preview.classList.add("hidden");
+    previewImage.removeAttribute("src");
+    render();
+    showNotice("Link created successfully.");
+    location.hash = "links";
+  });
+
+  list.addEventListener("click", async event => {
+    const copyButton = event.target.closest("[data-copy]");
+    if (copyButton) {
+      const slug = copyButton.dataset.copy;
+      try {
+        await navigator.clipboard.writeText(publicLink(slug));
+        copyButton.textContent = "Copied";
+        setTimeout(() => copyButton.textContent = "Copy", 1300);
+      } catch {
+        showNotice("Copy was blocked by the browser.", "error");
+      }
+      return;
+    }
+
+    const deleteButton = event.target.closest("[data-delete]");
+    if (deleteButton) {
+      const slug = deleteButton.dataset.delete;
+      if (!confirm("Delete this link?")) return;
+      saveLinks(getLinks().filter(x => x.slug !== slug));
+      render();
+      showNotice("Link deleted.");
+    }
+  });
+
+  $("siteBtn").addEventListener("click", () => {
+    location.hash = "create";
+    slugEl.focus();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
