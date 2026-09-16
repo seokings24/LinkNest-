@@ -1,0 +1,4 @@
+import {sql} from "@vercel/postgres";
+import {NextResponse} from "next/server";
+export const dynamic="force-dynamic";
+export async function GET(req,{params}){try{await sql`CREATE TABLE IF NOT EXISTS links(id SERIAL PRIMARY KEY,slug TEXT UNIQUE NOT NULL,title TEXT NOT NULL,image TEXT NOT NULL,destination TEXT NOT NULL,owner_id TEXT NOT NULL,created_at TIMESTAMPTZ DEFAULT NOW())`;const {rows}=await sql`SELECT destination FROM links WHERE slug=${params.slug} LIMIT 1`;if(!rows.length)return new NextResponse("Link not found",{status:404});return NextResponse.redirect(rows[0].destination,301)}catch(e){console.error(e);return new NextResponse("Redirect service unavailable",{status:500})}}

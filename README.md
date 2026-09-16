@@ -1,47 +1,25 @@
-# LinkNest — GitHub Pages HTML + JavaScript
+# LinkNest — GitHub + Vercel full version
 
-This is the GitHub Pages/static version. It needs only:
+GitHub stores the source. Vercel runs the Next.js server and database API.
 
-- `index.html`
-- `404.html`
-- `style.css`
+No Login/Register.
 
-## Features
-
-- URL SLUG field
+Features:
+- URL SLUG
 - Title
-- Photo URL
-- Live photo preview
-- Create link
-- Copy link
-- Open link
-- Delete link
-- Browser-private link list using `localStorage`
-- No Login/Register
-- Responsive dashboard
+- Photo URL + preview
+- Create / Copy / Open / Delete
+- Browser-private dashboard: each browser gets a separate HttpOnly browser ID cookie
+- Public `/go/<slug>` lookup from PostgreSQL
+- Real HTTP 301 redirect from every browser/device
 
-## GitHub Pages setup
+## Deploy
 
-Upload the three files to the repository root.
+1. Upload this repository to GitHub.
+2. Import the GitHub repository into Vercel.
+3. In Vercel create/connect a Postgres database so the project gets `POSTGRES_URL`/Vercel Postgres environment variables.
+4. Redeploy.
 
-Then go to:
+If the database is not connected, Create Link cannot work. Once connected, the app automatically creates its `links` table.
 
-**Repository → Settings → Pages → Deploy from a branch → main → /(root) → Save**
-
-## Redirect behavior
-
-The `/go/<slug>` path is handled by `404.html` and JavaScript. It redirects to the destination stored in that browser's local storage.
-
-### Important limitation
-
-GitHub Pages is static hosting. It cannot run PHP, Node.js, SQLite, or server-side HTTP redirects.
-
-Therefore this version **cannot provide a real HTTP 301 status**. It provides a client-side redirect instead.
-
-Also, because the data is intentionally browser-private:
-
-- Browser A can see Browser A's created links.
-- Browser B cannot see Browser A's link list.
-- A link created in Browser A is not available to Browser B's redirect lookup.
-
-A truly public `/go/slug` that works from every browser requires a server-side database/redirect service.
+Important: the dashboard is not login-protected. The browser-private separation is based on a browser cookie. The public redirect is intentionally available to anyone who has the generated URL.
